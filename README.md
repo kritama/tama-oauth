@@ -159,10 +159,10 @@ For an urgent production correction, create `hotfix/<slug>` from `master`, use
 `fix:` commits, and merge it into `master`. Complete the generated patch release
 pull request, then merge `master` back into `develop`.
 
-The release manifest starts at `0.0.0`, so the first `feat:` commit promoted to
-`master` produces the package's initial `0.1.0` release. Only `master` can
-create tags or publish to Hex. CI validates both protected branches and every
-pull request without publishing.
+The release configuration bootstraps the package at `0.1.0`; later releases use
+the version recorded in the release manifest and the Conventional Commits
+promoted to `master`. Only `master` can create tags or publish to Hex. CI
+validates both protected branches and every pull request without publishing.
 
 Before the first release, configure the repository as follows:
 
