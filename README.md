@@ -121,6 +121,71 @@ mix docs
 mix hex.build
 ```
 
+## Releasing
+
+TamaOAuth uses Git Flow with `develop` as the integration branch and `master`
+as the production branch:
+
+- `feature/*` branches start from `develop` and merge back into `develop`;
+- `fix/*` branches start from `develop` and merge back into `develop`;
+- `release/*` branches start from `develop`, contain only stabilization work,
+  and merge into `master`; and
+- `hotfix/*` branches start from `master` and merge directly into `master`.
+
+Commits use the Conventional Commits format. The highest-impact commit reaching
+`master` controls the next semantic version:
+
+- `fix:` produces a patch release;
+- `feat:` produces a minor release; and
+- `feat!:`, `fix!:`, or a `BREAKING CHANGE:` footer produces a breaking
+  release. Before `1.0.0`, breaking changes advance the minor version.
+
+For a normal release:
+
+1. Create `release/<planned-version>` from `develop` and perform final release
+   fixes there.
+2. Open a pull request from the release branch to `master`. Preserve the
+   Conventional Commit history with a merge commit. If the pull request is
+   squash-merged, its squash title must be a Conventional Commit containing the
+   highest required release signal.
+3. The merge into `master` makes Release Please open or update its generated
+   release pull request with the next version and changelog.
+4. Merge the generated release pull request. This creates the `vX.Y.Z` tag and
+   GitHub release, reruns every package check from the tag, and publishes the
+   package and documentation to Hex.
+5. Merge `master` back into `develop`, then delete the release branch.
+
+For an urgent production correction, create `hotfix/<slug>` from `master`, use
+`fix:` commits, and merge it into `master`. Complete the generated patch release
+pull request, then merge `master` back into `develop`.
+
+The release configuration bootstraps the package at `0.1.0`; later releases use
+the version recorded in the release manifest and the Conventional Commits
+promoted to `master`. Only `master` can create tags or publish to Hex. CI
+validates both protected branches and every pull request without publishing.
+
+Before the first release, configure the repository as follows:
+
+1. Create a GitHub environment named `hex`. Restrict deployments to the
+   protected `master` branch, add required reviewers, prevent self-review, and
+   disable administrator bypass where appropriate.
+2. Save a dedicated, expiring Hex key with API write permission as the
+   repository secret `HEX_API_KEY`. The protected `hex` environment still
+   gates the publishing job before it can access the repository secret. Prefer
+   an organization key over a personal key when publishing for a Hex
+   organization.
+3. Protect both `develop` and `master` and require the CI checks before
+   merging.
+4. Enable **Allow GitHub Actions to create and approve pull requests** under
+   the organization and repository **Settings > Actions > General** pages.
+   Release Please uses the short-lived `GITHUB_TOKEN`. Because events created
+   by that token do not start new workflow runs, the release workflow explicitly
+   dispatches CI for its generated pull request.
+
+If Hex publication fails after the GitHub release exists, run the **Publish
+Hex** workflow manually from `master` with that existing `vX.Y.Z` tag. Do not
+create a new tag or change `mix.exs` for a retry.
+
 ## License
 
 TamaOAuth is licensed under the [Apache License 2.0](LICENSE).
