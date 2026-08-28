@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial supervised Mix library.
 - Hex package metadata, Apache-2.0 licensing, and multi-version CI with strict
   Credo and Dialyzer checks.
+- Git Flow release and hotfix promotion, Conventional Commit release
+  preparation, protected tag verification, and a gated GitHub Actions workflow
+  for publishing packages and documentation to Hex.
 - Backend-neutral authorization-server and protected-resource architecture.
 - Bounded authorization, token, revocation, introspection, and Dynamic Client
   Registration request values.
