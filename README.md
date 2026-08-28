@@ -176,11 +176,11 @@ Before the first release, configure the repository as follows:
    organization.
 3. Protect both `develop` and `master` and require the CI checks before
    merging.
-4. Add a fine-grained service-account token as the repository secret
-   `RELEASE_PLEASE_TOKEN`. Scope it only to this repository with Contents,
-   Issues, and Pull requests write access. A separate token is required because
-   the organization does not allow the built-in `GITHUB_TOKEN` to create pull
-   requests or trigger CI for generated pull requests.
+4. Enable **Allow GitHub Actions to create and approve pull requests** under
+   the organization and repository **Settings > Actions > General** pages.
+   Release Please uses the short-lived `GITHUB_TOKEN`. Because events created
+   by that token do not start new workflow runs, the release workflow explicitly
+   dispatches CI for its generated pull request.
 
 If Hex publication fails after the GitHub release exists, run the **Publish
 Hex** workflow manually from `master` with that existing `vX.Y.Z` tag. Do not
