@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.0 (2026-08-28)
+
+
+### Features
+
+* prepare initial Hex release ([6dfe39a](https://github.com/kritama/tama-oauth/commit/6dfe39a39bb4191cc0023dca2ae302d282903128))
+* release TamaOAuth 0.1.0 ([a9b67ce](https://github.com/kritama/tama-oauth/commit/a9b67ce74a36939a0fbeb061fc3760c3da03e1e4))
+
+
+### Bug Fixes
+
+* **ci:** use GitHub token for release automation ([7c99e63](https://github.com/kritama/tama-oauth/commit/7c99e634da086fd8593b8ce9d58afa3a743b7711))
+* **release:** bootstrap version 0.1.0 ([1ed1435](https://github.com/kritama/tama-oauth/commit/1ed1435337e4859a7367ca3c29fba5b52d94c768))
+* **release:** bootstrap version 0.1.0 ([2ab877d](https://github.com/kritama/tama-oauth/commit/2ab877d50866c65e5e55d4c3e317653cdae1e348))
+
+## Changelog
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
