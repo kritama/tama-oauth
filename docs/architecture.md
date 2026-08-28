@@ -1,31 +1,9 @@
 # Architecture
 
-TamaOAuth is a protocol library with application-supplied adapters. It does not
-own database tables, application identities, lifecycle state, or HTTP routes.
-
-## Roles
-
-### Authorization server
-
-Memovee will compose the authorization-server protocol with adapters for:
-
-- client lookup and Client ID Metadata Document persistence;
-- authorization-code consumption;
-- grant and consent policy;
-- refresh-token family persistence and rotation;
-- access-token references and introspection;
-- asymmetric signing and public JWK publication;
-- subject-to-Actor mapping.
-
-### Resource server
-
-Tama will compose the resource-server protocol with adapters for:
-
-- issuer and audience configuration;
-- cached JWKS retrieval;
-- JWT verification;
-- online introspection when current authorization state is required;
-- Actor construction and scope enforcement.
+TamaOAuth is a protocol library with application-supplied adapters. It owns
+deterministic OAuth decisions and bounded parsing, but it does not own database
+tables, application identities, lifecycle state, authorization policy, or HTTP
+routes.
 
 ## Dependency direction
 
@@ -35,20 +13,73 @@ Memovee adapters ─┐
 Tama adapters ────┘
 ```
 
-The core must not depend on Memovee, Tama, Phoenix, Ecto, Ash, or Eventful.
-Framework integrations may be added later as optional packages or thin modules
-that depend on the core.
+The core has no dependency on Memovee, Tama, Phoenix, Ecto, Ash, or Eventful.
+Its public boundary uses package-owned structs and ordinary Elixir values; it
+does not expose Joken or JOSE structs.
 
-## Planned namespaces
+## Package responsibilities
 
-- `TamaOAuth.AuthorizationServer`
-- `TamaOAuth.ResourceServer`
-- `TamaOAuth.Client`
-- `TamaOAuth.Metadata`
-- `TamaOAuth.PKCE`
-- `TamaOAuth.Token`
-- `TamaOAuth.JWKS`
-- `TamaOAuth.Introspection`
+| Area | Modules | Result owned by the application |
+| --- | --- | --- |
+| Request validation | `TamaOAuth.AuthorizationRequest`, `TamaOAuth.TokenRequest`, `TamaOAuth.Scope`, `TamaOAuth.PKCE`, `TamaOAuth.URI` | Client lookup, consent, code loading, and transactions |
+| Client trust | `TamaOAuth.ClientMetadata`, `TamaOAuth.RemoteJSON`, `TamaOAuth.ClientRegistration` | Allowlist, cache, registrations, rate limits, and cleanup |
+| Client authentication | `TamaOAuth.ClientAuthentication` and its method modules | Key retrieval and durable assertion replay claims |
+| Tokens and keys | `TamaOAuth.JWT`, `TamaOAuth.JWKS`, `TamaOAuth.Crypto` | Key custody, signing configuration, and access-token references |
+| Lifecycle decisions | `TamaOAuth.RefreshToken`, `TamaOAuth.Introspection`, `TamaOAuth.Revocation` | Locks, persistence, Actor checks, and family revocation |
+| Discovery | `TamaOAuth.Metadata.AuthorizationServer`, `TamaOAuth.Metadata.ProtectedResource` | Routes, configured identifiers, and HTTP caching |
 
-These namespaces describe ownership areas, not committed APIs. Behaviours and
-data structures will be introduced only as implementation slices require them.
+## Authorization-server composition
+
+Memovee supplies adapters for client lookup and caching, signing keys, assertion
+replay storage, authorization-code consumption, grants, refresh-token families,
+access-token references, consent, and Actor policy. It calls TamaOAuth for the
+protocol decisions around those operations and applies the result within its
+own Ecto/Eventful transaction.
+
+In particular, `TamaOAuth.RefreshToken.evaluate/3` does not rotate a stored
+credential. It returns either a rotation decision, a family-replay signal, or a
+bounded OAuth error. Memovee must lock the relevant state and apply the result
+atomically.
+
+## Protected-resource composition
+
+Tama supplies issuer, audience, scope, and trusted-key configuration. It uses
+the protected-resource metadata builder and JWT/JWKS verification functions,
+then constructs its own authenticated principal from the verified `{iss, sub}`
+pair. Online introspection remains an application adapter because authentication
+of the introspection call and current Actor/grant policy belong to the apps.
+
+## Remote documents
+
+`TamaOAuth.RemoteJSON` provides the shared network safety policy used for Client
+ID Metadata Documents and JWKS:
+
+- HTTPS by default, with explicit loopback development opt-in;
+- DNS resolution before connection and address validation against private,
+  loopback, link-local, documentation, multicast, and reserved ranges;
+- connection pinning to a validated address while preserving the TLS hostname;
+- same-origin enforcement where the calling protocol requires it;
+- bounded redirects, response bodies, deadlines, and accepted media types; and
+- injected resolver/requester functions for deterministic tests.
+
+Applications still decide which client IDs are allowed, how long successful
+documents are cached, and how failures are rate-limited.
+
+## Adapter behaviours
+
+- `TamaOAuth.Clock` and `TamaOAuth.Random` isolate nondeterminism.
+- `TamaOAuth.ClientMetadata.Fetcher` permits controlled document retrieval.
+- `TamaOAuth.KeyProvider` keeps key custody application-owned.
+- `TamaOAuth.ReplayStore` defines the atomic assertion replay claim contract.
+
+Small function callbacks accepted by authentication and fetch APIs are useful
+for local composition and testing. Durable implementations belong in the
+consuming application and should satisfy the corresponding behaviour where one
+is defined.
+
+## Failure model
+
+Protocol validation fails closed. OAuth-facing failures use `TamaOAuth.Error`;
+remote-document and key-set boundaries use small tagged atom errors. Internal
+details may be attached to an error for application diagnostics, but
+`TamaOAuth.Error.to_map/1` deliberately omits them from the protocol response.

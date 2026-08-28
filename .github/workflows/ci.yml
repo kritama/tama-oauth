@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        elixir:
+          - 1.17.3
+          - 1.19.5
+        otp:
+          - 27.3.4.16
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Build Dialyzer PLT
+        run: mix dialyzer --plt
+
+      - name: Run package checks
+        run: mix precommit
+
+      - name: Run Dialyzer
+        run: mix dialyzer --no-check
+
+      - name: Build documentation
+        run: mix docs
+
+      - name: Build Hex archive
+        run: mix hex.build
