@@ -16,6 +16,7 @@ defmodule TamaOAuth.MixProject do
       homepage_url: @source_url,
       package: package(),
       docs: docs(),
+      dialyzer: dialyzer(),
       aliases: aliases()
     ]
   end
@@ -32,7 +33,15 @@ defmodule TamaOAuth.MixProject do
   end
 
   defp description do
-    "Backend-neutral OAuth 2.1 building blocks for Tama applications."
+    "Backend-neutral OAuth 2.1 and MCP authorization primitives for Elixir applications."
+  end
+
+  defp dialyzer do
+    [
+      plt_core_path: "priv/plts",
+      plt_add_apps: [:ex_unit, :mix],
+      plt_file: {:no_warn, "priv/plts/dialyzer.plt"}
+    ]
   end
 
   defp package do
@@ -46,19 +55,64 @@ defmodule TamaOAuth.MixProject do
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md", "LICENSE", "docs/architecture.md"]
+      extras: ["README.md", "CHANGELOG.md", "LICENSE", "docs/architecture.md"],
+      groups_for_modules: [
+        "Requests and values": [
+          TamaOAuth.AuthorizationRequest,
+          TamaOAuth.ClientRegistration,
+          TamaOAuth.Error,
+          TamaOAuth.Introspection,
+          TamaOAuth.PKCE,
+          TamaOAuth.RefreshToken,
+          TamaOAuth.Revocation,
+          TamaOAuth.Scope,
+          TamaOAuth.TokenRequest,
+          TamaOAuth.URI
+        ],
+        "Client trust": [
+          TamaOAuth.ClientAuthentication,
+          TamaOAuth.ClientAuthentication.None,
+          TamaOAuth.ClientAuthentication.PrivateKeyJWT,
+          TamaOAuth.ClientMetadata,
+          TamaOAuth.RemoteJSON
+        ],
+        "Tokens and discovery": [
+          TamaOAuth.Crypto,
+          TamaOAuth.JWT,
+          TamaOAuth.JWKS,
+          TamaOAuth.Metadata.AuthorizationServer,
+          TamaOAuth.Metadata.ProtectedResource
+        ],
+        "Adapter behaviours": [
+          TamaOAuth.ClientMetadata.Fetcher,
+          TamaOAuth.Clock,
+          TamaOAuth.KeyProvider,
+          TamaOAuth.Random,
+          TamaOAuth.ReplayStore
+        ]
+      ]
     ]
   end
 
   defp deps do
     [
+      {:jason, "~> 1.4"},
+      {:joken, "~> 2.6"},
+      {:req, "~> 0.6"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false}
     ]
   end
 
   defp aliases do
     [
-      precommit: ["format --check-formatted", "compile --warnings-as-errors", "test"]
+      precommit: [
+        "format --check-formatted",
+        "compile --warnings-as-errors",
+        "credo --strict",
+        "test"
+      ]
     ]
   end
 end

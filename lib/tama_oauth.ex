@@ -1,11 +1,14 @@
 defmodule TamaOAuth do
   @moduledoc """
-  Backend-neutral OAuth 2.1 building blocks for Tama applications.
+  Framework-neutral OAuth and MCP authorization primitives.
 
-  `TamaOAuth` contains protocol mechanics and contracts shared by authorization
-  servers and resource servers. Applications retain ownership of persistence,
-  identity, lifecycle, policy, and web concerns.
+  `TamaOAuth` contains the bounded protocol mechanics shared by Memovee's
+  authorization server and Tama's protected resource. It covers request
+  validation, PKCE, client metadata and authentication, JWT/JWKS operations,
+  metadata documents, refresh decisions, revocation, and introspection.
 
-  The initial architecture is documented in `docs/architecture.md`.
+  Applications retain ownership of persistence, transactions, identity,
+  lifecycle, policy, consent, caching, key custody, and web concerns. See the
+  Architecture guide for the integration boundary.
   """
 end

@@ -1,0 +1,99 @@
+name: Publish Hex
+run-name: Publish ${{ inputs.tag }} to Hex
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing v-prefixed release tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hex-publish-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.tag }}
+    if: github.repository == 'kritama/tama-oauth' && github.ref == 'refs/heads/master'
+    environment: hex
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          version-file: mise.toml
+          version-type: strict
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Verify release tag
+        env:
+          RELEASE_BRANCH: master
+          RELEASE_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          mix compile --warnings-as-errors
+          package_version="$(mix run --no-compile --no-start -e 'IO.write(Mix.Project.config()[:version])')"
+          expected_tag="v${package_version}"
+
+          if [[ "${RELEASE_TAG}" != "${expected_tag}" ]]; then
+            echo "::error::Release tag ${RELEASE_TAG} does not match package version ${expected_tag}"
+            exit 1
+          fi
+
+          release_sha="$(git rev-list -n 1 "${RELEASE_TAG}")"
+
+          if ! git merge-base --is-ancestor "${release_sha}" "origin/${RELEASE_BRANCH}"; then
+            echo "::error::Release tag ${RELEASE_TAG} is not reachable from ${RELEASE_BRANCH}"
+            exit 1
+          fi
+
+      - name: Audit Hex dependencies
+        run: mix hex.audit
+
+      - name: Run package checks
+        run: mix precommit
+
+      - name: Build Dialyzer PLT
+        run: mix dialyzer --plt
+
+      - name: Run Dialyzer
+        run: mix dialyzer --no-check
+
+      - name: Build documentation
+        run: mix docs
+
+      - name: Build Hex package
+        run: mix hex.build
+
+      - name: Publish package and documentation
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        shell: bash
+        run: |
+          if [[ -z "${HEX_API_KEY}" ]]; then
+            echo "::error::HEX_API_KEY is not configured in the hex environment"
+            exit 1
+          fi
+
+          mix hex.publish --yes

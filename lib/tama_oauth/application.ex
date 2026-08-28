@@ -5,7 +5,9 @@ defmodule TamaOAuth.Application do
 
   @impl true
   def start(_type, _args) do
-    children = []
+    children = [
+      {Task.Supervisor, name: TamaOAuth.TaskSupervisor}
+    ]
 
     Supervisor.start_link(children,
       strategy: :one_for_one,
