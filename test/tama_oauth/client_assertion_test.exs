@@ -3,7 +3,7 @@ defmodule TamaOAuth.ClientAssertionTest do
 
   alias TamaOAuth.{ClientAssertion, ClientAuthentication, ClientMetadata, Error}
 
-  @client_id "https://tama.example/oauth/introspection-client.json"
+  @client_id "tama-mcp-app"
   @audience "https://memovee.example/auth/introspections"
   @now 1_787_900_000
 
@@ -18,20 +18,16 @@ defmodule TamaOAuth.ClientAssertionTest do
     public_key =
       Map.merge(public_key, %{"kid" => "tama-introspection", "alg" => "RS256", "use" => "sig"})
 
-    {:ok, metadata} =
-      ClientMetadata.validate(
-        %{
-          "client_id" => @client_id,
-          "client_name" => "Tama MCP App",
-          "redirect_uris" => ["https://tama.example/mcp/app"],
-          "grant_types" => ["authorization_code"],
-          "response_types" => ["code"],
-          "token_endpoint_auth_methods_supported" => ["private_key_jwt"],
-          "token_endpoint_auth_signing_alg_values_supported" => ["RS256"],
-          "jwks_uri" => "https://tama.example/.well-known/jwks.json"
-        },
-        @client_id
-      )
+    metadata = %ClientMetadata{
+      client_id: @client_id,
+      client_name: "Tama MCP App",
+      redirect_uris: [],
+      grant_types: [],
+      response_types: [],
+      token_endpoint_auth_methods_supported: ["private_key_jwt"],
+      token_endpoint_auth_signing_algorithms: ["RS256"],
+      jwks_uri: "https://tama.example/.well-known/jwks.json"
+    }
 
     %{private_key: private_key, public_key: public_key, metadata: metadata}
   end
