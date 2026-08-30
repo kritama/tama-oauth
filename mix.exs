@@ -70,6 +70,7 @@ defmodule TamaOAuth.MixProject do
           TamaOAuth.URI
         ],
         "Client trust": [
+          TamaOAuth.ClientAssertion,
           TamaOAuth.ClientAuthentication,
           TamaOAuth.ClientAuthentication.None,
           TamaOAuth.ClientAuthentication.PrivateKeyJWT,
