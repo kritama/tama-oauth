@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/kritama/tama-oauth/compare/v0.2.0...v0.2.1) (2026-08-31)
+
+
+### Bug Fixes
+
+* centralize introspection client mechanics ([682d1d5](https://github.com/kritama/tama-oauth/commit/682d1d58b1d28061ee74af6a307b31a5fbec1903))
+* centralize introspection client mechanics ([f8e6d3e](https://github.com/kritama/tama-oauth/commit/f8e6d3e951c66592cc714df97881d5a30262fe65))
+* centralize introspection client mechanics ([9885709](https://github.com/kritama/tama-oauth/commit/988570900b83a1f7ad7845ad0aee94c73a33d156))
+
 ## [0.2.0](https://github.com/kritama/tama-oauth/compare/v0.1.0...v0.2.0) (2026-08-31)
 
 
