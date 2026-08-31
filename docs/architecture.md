@@ -24,7 +24,7 @@ does not expose Joken or JOSE structs.
 | Request validation | `TamaOAuth.AuthorizationRequest`, `TamaOAuth.TokenRequest`, `TamaOAuth.Scope`, `TamaOAuth.PKCE`, `TamaOAuth.URI` | Client lookup, consent, code loading, and transactions |
 | Client trust | `TamaOAuth.ClientMetadata`, `TamaOAuth.RemoteJSON`, `TamaOAuth.ClientRegistration` | Allowlist, cache, registrations, rate limits, and cleanup |
 | Client authentication | `TamaOAuth.ClientAssertion`, `TamaOAuth.ClientAuthentication`, `TamaOAuth.SigningKey`, and the authentication method modules | Private-key custody, time, assertion identifiers, key retrieval, and durable assertion replay claims |
-| Tokens and keys | `TamaOAuth.JWT`, `TamaOAuth.JWKS`, `TamaOAuth.Crypto` | Key custody, signing configuration, and access-token references |
+| Tokens and keys | `TamaOAuth.JWT`, `TamaOAuth.JWKS`, `TamaOAuth.Crypto`, `TamaOAuth.ProtectedResource` | Key custody, signing configuration, cached key resolution, rate limits, principals, and access-token references |
 | Lifecycle decisions | `TamaOAuth.RefreshToken`, `TamaOAuth.Introspection`, `TamaOAuth.Introspection.Client`, `TamaOAuth.Revocation` | Trusted introspection configuration, locks, persistence, Actor checks, and family revocation |
 | Discovery | `TamaOAuth.Metadata.AuthorizationServer`, `TamaOAuth.Metadata.ProtectedResource` | Routes, configured identifiers, and HTTP caching |
 
@@ -43,13 +43,15 @@ atomically.
 
 ## Protected-resource composition
 
-Tama supplies issuer, audience, scope, and trusted-key configuration. It uses
-the protected-resource metadata builder and JWT/JWKS verification functions,
-then constructs its own authenticated principal from the verified `{iss, sub}`
-pair. `TamaOAuth.Introspection.Client` owns the bounded authenticated wire
+Tama supplies issuer, audience, scope, and trusted-key configuration.
+`TamaOAuth.ProtectedResource` owns the protocol sequence of JWT verification,
+active introspection, exact security-claim agreement, and canonical claim
+construction. It calls application-supplied key-resolver and introspector
+callbacks. `TamaOAuth.Introspection.Client` owns the bounded authenticated wire
 exchange, while Tama selects the private key, endpoint, timeouts, and claim
-bindings. Current Actor and grant policy remain with the authorization-server
-application.
+bindings. Tama also owns JWKS cache state, rate limiting, telemetry, UUID
+identity semantics, and authenticated-principal construction. Current Actor and
+grant policy remain with the authorization-server application.
 
 ## Remote documents
 

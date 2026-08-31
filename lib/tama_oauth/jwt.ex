@@ -30,10 +30,8 @@ defmodule TamaOAuth.JWT do
   def verify_access_token(token, jwks, opts) when is_binary(token) and is_list(opts) do
     algorithms = Keyword.get(opts, :algorithms, ["RS256"])
 
-    with true <- byte_size(token) in 1..@max_token_bytes,
-         {:ok, %{"alg" => algorithm, "kid" => kid}} <- peek_header(token),
-         true <- algorithm in algorithms,
-         true <- is_binary(kid) and byte_size(kid) in 1..@max_kid_bytes,
+    with {:ok, %{"alg" => algorithm, "kid" => kid}} <-
+           peek_access_token_header(token, algorithms: algorithms),
          {:ok, key} <- JWKS.select(jwks, kid, algorithm, algorithms: algorithms),
          {:ok, claims} <- verify_signature(token, key, algorithm),
          :ok <- validate_access_claims(claims, opts) do
@@ -44,6 +42,34 @@ defmodule TamaOAuth.JWT do
   end
 
   def verify_access_token(_token, _jwks, _opts),
+    do: {:error, Error.new(:invalid_token, stage: :access_token)}
+
+  @doc """
+  Peeks at an access-token header after applying the package's input bounds.
+
+  The returned header is still unverified. This function exists so callers
+  that must resolve a verification key can reject malformed input before
+  invoking an application-owned resolver.
+  """
+  @spec peek_access_token_header(String.t(), keyword()) ::
+          {:ok, map()} | {:error, Error.t()}
+  def peek_access_token_header(token, opts \\ [])
+
+  def peek_access_token_header(token, opts) when is_binary(token) and is_list(opts) do
+    algorithms = Keyword.get(opts, :algorithms, ["RS256"])
+
+    with true <- byte_size(token) in 1..@max_token_bytes,
+         true <- is_list(algorithms),
+         {:ok, %{"alg" => algorithm, "kid" => kid} = header} <- peek_header(token),
+         true <- algorithm in algorithms,
+         true <- is_binary(kid) and byte_size(kid) in 1..@max_kid_bytes do
+      {:ok, header}
+    else
+      _ -> {:error, Error.new(:invalid_token, stage: :access_token)}
+    end
+  end
+
+  def peek_access_token_header(_token, _opts),
     do: {:error, Error.new(:invalid_token, stage: :access_token)}
 
   @spec peek_header(String.t()) :: {:ok, map()} | {:error, :invalid_token}

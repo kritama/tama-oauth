@@ -83,6 +83,7 @@ defmodule TamaOAuth.MixProject do
           TamaOAuth.Crypto,
           TamaOAuth.JWT,
           TamaOAuth.JWKS,
+          TamaOAuth.ProtectedResource,
           TamaOAuth.Metadata.AuthorizationServer,
           TamaOAuth.Metadata.ProtectedResource
         ],
