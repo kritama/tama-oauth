@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/kritama/tama-oauth/compare/v0.1.0...v0.2.0) (2026-08-31)
+
+
+### Features
+
+* mint private key client assertions ([1873500](https://github.com/kritama/tama-oauth/commit/18735006aba3f9a49eb6a9812fbcebbd97cb8390))
+
+
+### Bug Fixes
+
+* preserve configured assertion audience ([0b12f22](https://github.com/kritama/tama-oauth/commit/0b12f22414c5fd4af359ddd68739b1532d977505))
+
 ## 0.1.0 (2026-08-28)
 
 ### Features
