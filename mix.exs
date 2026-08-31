@@ -1,7 +1,7 @@
 defmodule TamaOAuth.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/kritama/tama-oauth"
 
   def project do
@@ -70,6 +70,7 @@ defmodule TamaOAuth.MixProject do
           TamaOAuth.URI
         ],
         "Client trust": [
+          TamaOAuth.ClientAssertion,
           TamaOAuth.ClientAuthentication,
           TamaOAuth.ClientAuthentication.None,
           TamaOAuth.ClientAuthentication.PrivateKeyJWT,
