@@ -95,8 +95,8 @@ defmodule TamaOAuth.ProtectedResource do
     do: is_function(context.key_resolver, 2) and is_function(context.introspector, 2)
 
   defp verify(token, context) do
-    with {:ok, %{"alg" => algorithm, "kid" => kid}} <- JWT.peek_header(token),
-         true <- algorithm in context.algorithms,
+    with {:ok, %{"alg" => algorithm, "kid" => kid}} <-
+           JWT.peek_access_token_header(token, algorithms: context.algorithms),
          {:ok, key} <- resolve_key(context.key_resolver, kid, algorithm),
          {:ok, claims} <-
            JWT.verify_access_token(token, %{"keys" => [key]},

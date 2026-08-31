@@ -35,7 +35,13 @@ defmodule TamaOAuth.ProtectedResourceTest do
       |> Map.put("active", true)
       |> Map.put("grant_id", "grant-identifier")
 
-    %{active: active, claims: claims, public_key: public_key, token: token}
+    %{
+      active: active,
+      claims: claims,
+      private_key: private_key,
+      public_key: public_key,
+      token: token
+    }
   end
 
   test "verifies, introspects, agrees, and returns canonical claims", context do
@@ -134,6 +140,34 @@ defmodule TamaOAuth.ProtectedResourceTest do
     refute_receive :introspected
   end
 
+  test "rejects bounded token-header violations before resolving a key", context do
+    test_pid = self()
+
+    resolver = fn kid, algorithm ->
+      send(test_pid, {:resolved, kid, algorithm})
+      {:error, :temporarily_unavailable}
+    end
+
+    introspector = fn _token, _claims ->
+      send(test_pid, :introspected)
+      {:ok, context.active}
+    end
+
+    malformed_tokens = [
+      context.token <> String.duplicate("x", 16_385),
+      token_with_kid(context, 123),
+      token_with_kid(context, String.duplicate("k", 129))
+    ]
+
+    for token <- malformed_tokens do
+      assert {:error, %Error{code: :invalid_token, stage: :access_token}} =
+               ProtectedResource.authenticate(token, options(resolver, introspector))
+    end
+
+    refute_receive {:resolved, _kid, _algorithm}
+    refute_receive :introspected
+  end
+
   test "fails closed when an application callback raises", context do
     resolver = fn _kid, _algorithm -> raise "key store failure" end
     introspector = fn _token, _claims -> {:ok, context.active} end
@@ -165,4 +199,10 @@ defmodule TamaOAuth.ProtectedResourceTest do
   end
 
   defp key_resolver(context), do: fn _kid, _algorithm -> {:ok, context.public_key} end
+
+  defp token_with_kid(context, kid) do
+    signer = Joken.Signer.create("RS256", context.private_key, %{"kid" => kid})
+    {:ok, token} = Joken.Signer.sign(context.claims, signer)
+    token
+  end
 end
