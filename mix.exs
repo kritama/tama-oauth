@@ -62,6 +62,7 @@ defmodule TamaOAuth.MixProject do
           TamaOAuth.ClientRegistration,
           TamaOAuth.Error,
           TamaOAuth.Introspection,
+          TamaOAuth.Introspection.Client,
           TamaOAuth.PKCE,
           TamaOAuth.RefreshToken,
           TamaOAuth.Revocation,
@@ -75,7 +76,8 @@ defmodule TamaOAuth.MixProject do
           TamaOAuth.ClientAuthentication.None,
           TamaOAuth.ClientAuthentication.PrivateKeyJWT,
           TamaOAuth.ClientMetadata,
-          TamaOAuth.RemoteJSON
+          TamaOAuth.RemoteJSON,
+          TamaOAuth.SigningKey
         ],
         "Tokens and discovery": [
           TamaOAuth.Crypto,

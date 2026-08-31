@@ -19,6 +19,8 @@ The package is pre-release. Its public API may change before `1.0.0`.
 - Client ID Metadata Document validation and SSRF-resistant retrieval;
 - public-client and `private_key_jwt` authentication with replay callbacks;
 - bounded `private_key_jwt` client-assertion minting;
+- bounded authenticated token-introspection requests and response validation;
+- asymmetric private signing-key decoding, normalization, and eligibility checks;
 - asymmetric JWT access-token signing and verification;
 - public-only JWKS publication, retrieval, validation, and key selection;
 - refresh-token rotation and family-replay decisions;
@@ -90,29 +92,27 @@ For remote Client ID Metadata Documents, `TamaOAuth.ClientMetadata.fetch/2`
 uses the package's bounded `Req` fetcher by default. Production applications
 must still apply their own client-ID allowlist and cache the validated result.
 
-Mint a short-lived assertion for an authenticated introspection request while
-keeping time, the replay-resistant identifier, and private-key custody in the
+Perform an authenticated introspection request while keeping trust policy,
+time, the replay-resistant identifier, and private-key custody in the
 application:
 
 ```elixir
-{:ok, assertion, claims} =
-  TamaOAuth.ClientAssertion.mint(
-    "tama-mcp-app",
-    "https://memovee.example/auth/introspections",
-    introspection_private_jwk,
+{:ok, result} =
+  TamaOAuth.Introspection.Client.introspect(
+    incoming_access_token,
+    endpoint: "https://memovee.example/auth/introspections",
+    client_id: "tama-mcp-app",
+    key: introspection_private_jwk,
     algorithm: "RS256",
     algorithms: ["RS256"],
     kid: "tama-introspection-1",
     jti: fresh_assertion_id,
     now: DateTime.utc_now() |> DateTime.to_unix(),
-    ttl: 60
+    ttl: 60,
+    issuer: "https://memovee.example",
+    audience: "https://tama.example/mcp/app",
+    scopes: ["mcp.message"]
   )
-
-params = %{
-  "client_id" => "tama-mcp-app",
-  "client_assertion_type" => TamaOAuth.ClientAssertion.assertion_type(),
-  "client_assertion" => assertion
-}
 ```
 
 ## Integration rule

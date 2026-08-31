@@ -7,7 +7,7 @@ defmodule TamaOAuth.ClientAssertion do
   constructs the required header and claims, and signs the compact assertion.
   """
 
-  alias TamaOAuth.{Error, JWKS, URI}
+  alias TamaOAuth.{Error, SigningKey, URI}
 
   @assertion_type "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
   @supported_algorithms ["RS256", "PS256", "ES256"]
@@ -74,24 +74,12 @@ defmodule TamaOAuth.ClientAssertion do
   end
 
   defp validate_signing_key(key, algorithm, kid) do
-    valid_metadata? =
-      key["alg"] in [nil, algorithm] and key["kid"] in [nil, kid] and
-        key["use"] in [nil, "sig"] and signing_operation?(key["key_ops"])
-
-    normalized =
-      key
-      |> Map.delete("key_ops")
-      |> Map.merge(%{"alg" => algorithm, "kid" => kid, "use" => "sig"})
-
-    with true <- valid_metadata?,
-         true <- private_signing_key?(normalized, algorithm),
-         {:ok, public_jwks} <- JWKS.public_document([normalized]),
-         {:ok, _public_key} <-
-           JWKS.select(public_jwks, kid, algorithm, algorithms: [algorithm]) do
-      {:ok, normalized}
-    else
-      _ -> invalid_request(:client_assertion_key)
-    end
+    SigningKey.load(key,
+      algorithm: algorithm,
+      algorithms: [algorithm],
+      kid: kid,
+      stage: :client_assertion_key
+    )
   end
 
   defp claims(client_id, audience, jti, now, ttl) do
@@ -133,22 +121,6 @@ defmodule TamaOAuth.ClientAssertion do
   end
 
   defp bounded_string?(_value, _max_bytes), do: false
-
-  defp signing_operation?(nil), do: true
-
-  defp signing_operation?(operations) when is_list(operations),
-    do: "sign" in operations and Enum.all?(operations, &is_binary/1)
-
-  defp signing_operation?(_operations), do: false
-
-  defp private_signing_key?(%{"kty" => "RSA", "d" => d}, algorithm)
-       when algorithm in ["RS256", "PS256"],
-       do: is_binary(d) and d != ""
-
-  defp private_signing_key?(%{"kty" => "EC", "crv" => "P-256", "d" => d}, "ES256"),
-    do: is_binary(d) and d != ""
-
-  defp private_signing_key?(_key, _algorithm), do: false
 
   defp invalid_request(stage), do: {:error, Error.new(:invalid_request, stage: stage)}
 
