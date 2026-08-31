@@ -20,6 +20,8 @@ The package is pre-release. Its public API may change before `1.0.0`.
 - public-client and `private_key_jwt` authentication with replay callbacks;
 - bounded `private_key_jwt` client-assertion minting;
 - bounded authenticated token-introspection requests and response validation;
+- protected-resource JWT verification, introspection, exact claim agreement,
+  and canonical claim construction with application-supplied callbacks;
 - asymmetric private signing-key decoding, normalization, and eligibility checks;
 - asymmetric JWT access-token signing and verification;
 - public-only JWKS publication, retrieval, validation, and key selection;
@@ -113,6 +115,25 @@ application:
     audience: "https://tama.example/mcp/app",
     scopes: ["mcp.message"]
   )
+```
+
+Authenticate a protected-resource request while keeping key caching,
+introspection credentials, rate limiting, and identity mapping in the
+application:
+
+```elixir
+TamaOAuth.ProtectedResource.authenticate(incoming_access_token,
+  issuer: "https://memovee.example",
+  audience: "https://tama.example/mcp/app",
+  scopes: ["mcp.message"],
+  algorithms: ["RS256"],
+  key_resolver: fn kid, algorithm -> cached_key(kid, algorithm) end,
+  introspector: fn token, offline_claims ->
+    with :ok <- allow_introspection(offline_claims["jti"]) do
+      introspect(token)
+    end
+  end
+)
 ```
 
 ## Integration rule
