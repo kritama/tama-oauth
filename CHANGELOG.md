@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/kritama/tama-oauth/compare/v0.2.1...v0.3.0) (2026-08-31)
+
+
+### Features
+
+* add protected resource authentication ([266de69](https://github.com/kritama/tama-oauth/commit/266de6950271ae4f0846bfd4ffea1c0fa3986b15))
+* add protected resource authentication ([5fb2f9f](https://github.com/kritama/tama-oauth/commit/5fb2f9f153af7274702c79a906281f78fd70daf4))
+* add protected resource authentication ([59955e9](https://github.com/kritama/tama-oauth/commit/59955e9906d1f44b704f96fe2e1b1eebf64ae925))
+
+
+### Bug Fixes
+
+* bound protected resource token headers ([91fe522](https://github.com/kritama/tama-oauth/commit/91fe522b9b0c9c4fcc6442bc1dd72c66bf9bae99))
+
 ## [0.2.1](https://github.com/kritama/tama-oauth/compare/v0.2.0...v0.2.1) (2026-08-31)
 
 
