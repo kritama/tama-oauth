@@ -49,7 +49,7 @@ defmodule TamaOAuth.ClientAssertion do
   defp validate_claim_inputs(client_id, audience, jti) do
     valid? =
       bounded_string?(client_id, @max_identifier_bytes) and
-        exact_uri?(audience) and
+        valid_uri?(audience) and
         bounded_string?(jti, @max_jti_bytes)
 
     if valid?, do: :ok, else: invalid_request(:client_assertion_claims)
@@ -121,11 +121,11 @@ defmodule TamaOAuth.ClientAssertion do
   defp validate_assertion_size(_assertion, _max_bytes),
     do: invalid_request(:client_assertion_size)
 
-  defp exact_uri?(value) when byte_size(value) in 1..@max_identifier_bytes do
-    match?({:ok, ^value}, URI.normalize(value))
+  defp valid_uri?(value) when byte_size(value) in 1..@max_identifier_bytes do
+    match?({:ok, _normalized}, URI.normalize(value))
   end
 
-  defp exact_uri?(_value), do: false
+  defp valid_uri?(_value), do: false
 
   defp bounded_string?(value, max_bytes)
        when is_binary(value) and byte_size(value) in 1..max_bytes//1 do

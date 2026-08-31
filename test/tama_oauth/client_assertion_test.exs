@@ -95,6 +95,23 @@ defmodule TamaOAuth.ClientAssertionTest do
     end
   end
 
+  test "preserves valid noncanonical audience spellings", context do
+    audiences = [
+      "https://memovee.example:443/auth/introspections",
+      "https://MEMOVEE.EXAMPLE/auth/introspections"
+    ]
+
+    for audience <- audiences do
+      assert {:ok, _assertion, %{"aud" => ^audience}} =
+               ClientAssertion.mint(
+                 @client_id,
+                 audience,
+                 context.private_key,
+                 mint_options()
+               )
+    end
+  end
+
   test "rejects public, symmetric, weak, and mismatched signing keys", context do
     symmetric = %{
       "kty" => "oct",
