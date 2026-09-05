@@ -94,6 +94,28 @@ For remote Client ID Metadata Documents, `TamaOAuth.ClientMetadata.fetch/2`
 uses the package's bounded `Req` fetcher by default. Production applications
 must still apply their own client-ID allowlist and cache the validated result.
 
+Public HTTPS origins are accepted by default. A deployment where a public peer
+origin resolves to a private container-network address can opt in to only those
+exact HTTPS origins under the `:tama_oauth` application:
+
+```elixir
+config :tama_oauth, TamaOAuth.RemoteJSON,
+  trusted_private_origins: ["https://app.localhost"]
+```
+
+Trust entries are bounded and matched exactly by scheme, hostname, and effective
+port. They may resolve to RFC1918 or IPv6 ULA addresses while DNS pinning and
+normal certificate and hostname verification remain enabled. IP literals,
+loopback, link-local, metadata, multicast, and other reserved addresses remain
+blocked by this policy. Per-request `:trusted_private_origins` replaces the
+application default when a caller needs narrower trust.
+
+In a two-process Tama MCP App setup, configure each process independently: Tama
+trusts only the provider origin (for example `https://app.localhost`) and the
+provider trusts only the Tama origin (for example
+`https://tama.app.localhost`). Docker service names and bridge addresses remain
+private routing details, never OAuth identities.
+
 Perform an authenticated introspection request while keeping trust policy,
 time, the replay-resistant identifier, and private-key custody in the
 application:
