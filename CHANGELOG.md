@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.1](https://github.com/kritama/tama-oauth/compare/v0.4.0...v0.4.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* infer omitted client application type ([129e140](https://github.com/kritama/tama-oauth/commit/129e140296adae64dc6dd8feee01e0057d806680))
+* infer omitted client application type ([695c1b2](https://github.com/kritama/tama-oauth/commit/695c1b2e5d31095ec6a362deda436933f5ab4b7a))
+* infer omitted client application type ([60322a9](https://github.com/kritama/tama-oauth/commit/60322a9fe68ea59632e190e9903e229e3e3ad0eb))
+
 ## [0.4.0](https://github.com/kritama/tama-oauth/compare/v0.3.0...v0.4.0) (2026-09-05)
 
 
