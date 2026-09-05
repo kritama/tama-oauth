@@ -39,6 +39,20 @@ defmodule TamaOAuth.ClientRegistrationTest do
     assert second.metadata_digest == third.metadata_digest
   end
 
+  test "infers native for OpenCode's registration request without application_type" do
+    params = Map.delete(@valid, "application_type")
+
+    assert {:ok, inferred} =
+             ClientRegistration.normalize(params, supported_scopes: ["mcp.message"])
+
+    assert {:ok, explicit} =
+             ClientRegistration.normalize(@valid, supported_scopes: ["mcp.message"])
+
+    assert inferred.application_type == "native"
+    assert inferred.redirect_uris == ["http://127.0.0.1:19876/mcp/oauth/callback"]
+    assert inferred.metadata_digest == explicit.metadata_digest
+  end
+
   test "supports HTTPS callbacks for web clients" do
     params = %{
       @valid
@@ -50,6 +64,25 @@ defmodule TamaOAuth.ClientRegistrationTest do
              ClientRegistration.normalize(params, supported_scopes: ["mcp.message"])
 
     assert registration.application_type == "web"
+  end
+
+  test "infers web for registrations with only HTTPS redirects" do
+    explicit = %{
+      @valid
+      | "application_type" => "web",
+        "redirect_uris" => ["https://app.example/callback"]
+    }
+
+    assert {:ok, inferred} =
+             explicit
+             |> Map.delete("application_type")
+             |> ClientRegistration.normalize(supported_scopes: ["mcp.message"])
+
+    assert {:ok, explicit} =
+             ClientRegistration.normalize(explicit, supported_scopes: ["mcp.message"])
+
+    assert inferred.application_type == "web"
+    assert inferred.metadata_digest == explicit.metadata_digest
   end
 
   test "rejects unsafe native callbacks and confidential methods" do
@@ -75,13 +108,52 @@ defmodule TamaOAuth.ClientRegistrationTest do
              )
   end
 
-  test "requires the 2026 MCP application type and supported scopes" do
-    assert {:error, %Error{code: :invalid_client_metadata, stage: :application_type}} =
+  test "rejects invalid inferred redirect classes" do
+    for redirects <- [
+          [
+            "http://127.0.0.1:19876/mcp/oauth/callback",
+            "https://app.example/callback"
+          ],
+          ["http://example.com:19876/callback"],
+          ["https://app.example:abc/callback"],
+          [
+            "http://127.0.0.1:19876/mcp/oauth/callback",
+            "http://127.0.0.1:19876/mcp/oauth/callback"
+          ]
+        ] do
+      assert {:error, %Error{code: :invalid_redirect_uri, stage: :redirect_uris}} =
+               ClientRegistration.normalize(
+                 @valid
+                 |> Map.delete("application_type")
+                 |> Map.put("redirect_uris", redirects),
+                 supported_scopes: ["mcp.message"]
+               )
+    end
+  end
+
+  test "rejects explicit type mismatches and unsupported application types" do
+    assert {:error, %Error{code: :invalid_redirect_uri, stage: :redirect_uris}} =
              ClientRegistration.normalize(
-               Map.delete(@valid, "application_type"),
+               %{@valid | "application_type" => "web"},
                supported_scopes: ["mcp.message"]
              )
 
+    assert {:error, %Error{code: :invalid_redirect_uri, stage: :redirect_uris}} =
+             ClientRegistration.normalize(
+               %{@valid | "redirect_uris" => ["https://app.example/callback"]},
+               supported_scopes: ["mcp.message"]
+             )
+
+    for unsupported <- ["desktop", nil, 123] do
+      assert {:error, %Error{code: :invalid_client_metadata, stage: :application_type}} =
+               ClientRegistration.normalize(
+                 %{@valid | "application_type" => unsupported},
+                 supported_scopes: ["mcp.message"]
+               )
+    end
+  end
+
+  test "rejects unsupported scopes" do
     assert {:error, %Error{code: :invalid_scope}} =
              ClientRegistration.normalize(
                %{@valid | "scope" => "mcp.admin"},
