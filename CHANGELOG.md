@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/kritama/tama-oauth/compare/v0.3.0...v0.4.0) (2026-09-05)
+
+
+### Features
+
+* support exact trusted private origins ([73dd6c3](https://github.com/kritama/tama-oauth/commit/73dd6c34feb966b58719941ce51ae3ba8d11135e))
+* support exact trusted private origins ([366037b](https://github.com/kritama/tama-oauth/commit/366037bc7050a9aff7682a12b0f0b1a1045f98d4))
+
+
+### Bug Fixes
+
+* block redirects into trusted private origins ([bf01f14](https://github.com/kritama/tama-oauth/commit/bf01f14a621b1748233610e75919ae166a1a0329))
+
 ## [0.3.0](https://github.com/kritama/tama-oauth/compare/v0.2.1...v0.3.0) (2026-08-31)
 
 
