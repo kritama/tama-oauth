@@ -240,6 +240,53 @@ defmodule TamaOAuth.RemoteJSONTest do
              )
   end
 
+  test "public redirects cannot enter a trusted private origin" do
+    requester = fn
+      %URI{host: "public.example"}, {8, 8, 8, 8}, _opts ->
+        {:ok,
+         %{
+           status: 302,
+           headers: %{"location" => ["https://app.localhost/private.json"]},
+           body: ""
+         }}
+
+      _uri, _address, _opts ->
+        flunk("trusted private redirect target must not be requested")
+    end
+
+    assert {:error, :invalid_response} =
+             RemoteJSON.fetch("https://public.example/client.json",
+               trusted_private_origins: ["https://app.localhost"],
+               resolver: fn
+                 "public.example" -> {:ok, [{8, 8, 8, 8}]}
+                 "app.localhost" -> flunk("trusted private redirect target must not be resolved")
+               end,
+               requester: requester
+             )
+  end
+
+  test "trusted private redirects remain available within the exact origin" do
+    requester = fn
+      %URI{path: "/client.json"}, {172, 20, 0, 4}, _opts ->
+        {:ok,
+         %{
+           status: 302,
+           headers: %{"location" => ["/final.json"]},
+           body: ""
+         }}
+
+      %URI{path: "/final.json"}, {172, 20, 0, 4}, _opts ->
+        json_response()
+    end
+
+    assert {:ok, %{url: "https://app.localhost/final.json"}} =
+             RemoteJSON.fetch("https://app.localhost/client.json",
+               trusted_private_origins: ["https://app.localhost"],
+               resolver: fn "app.localhost" -> {:ok, [{172, 20, 0, 4}]} end,
+               requester: requester
+             )
+  end
+
   test "allows loopback HTTP only when explicitly enabled" do
     requester = fn _uri, {127, 0, 0, 1}, _opts ->
       {:ok,

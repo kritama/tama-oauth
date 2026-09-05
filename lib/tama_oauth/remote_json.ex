@@ -273,8 +273,12 @@ defmodule TamaOAuth.RemoteJSON do
 
   defp validate_trusted_redirect(url, next_url, opts) do
     trusted_private_origins = Keyword.fetch!(opts, :normalized_trusted_private_origins)
+    source_trusted? = trusted_private_origin?(Elixir.URI.parse(url), trusted_private_origins)
 
-    if trusted_private_origin?(Elixir.URI.parse(url), trusted_private_origins) do
+    destination_trusted? =
+      trusted_private_origin?(Elixir.URI.parse(next_url), trusted_private_origins)
+
+    if source_trusted? or destination_trusted? do
       if OAuthURI.same_origin?(url, next_url), do: :ok, else: {:error, :invalid_origin}
     else
       :ok
