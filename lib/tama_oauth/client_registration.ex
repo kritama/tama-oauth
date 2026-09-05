@@ -34,10 +34,11 @@ defmodule TamaOAuth.ClientRegistration do
   def normalize(params, opts) when is_map(params) and map_size(params) <= @max_members do
     supported_scopes = Keyword.fetch!(opts, :supported_scopes)
 
-    with {:ok, application_type} <- application_type(params["application_type"]),
+    with {:ok, requested_application_type} <- application_type(params),
          {:ok, client_name} <- client_name(params["client_name"]),
          {:ok, client_uri} <- client_uri(params["client_uri"]),
-         {:ok, redirect_uris} <- redirect_uris(params["redirect_uris"], application_type),
+         {:ok, redirect_uris, application_type} <-
+           redirect_uris(params["redirect_uris"], requested_application_type),
          :ok <- fixed_list(params["grant_types"], @grant_types, :grant_types),
          :ok <- fixed_list(params["response_types"], @response_types, :response_types),
          :ok <- authentication_method(params["token_endpoint_auth_method"]),
@@ -84,8 +85,13 @@ defmodule TamaOAuth.ClientRegistration do
     }
   end
 
-  defp application_type(type) when type in ["native", "web"], do: {:ok, type}
-  defp application_type(_type), do: invalid_metadata(:application_type)
+  defp application_type(params) do
+    case Map.fetch(params, "application_type") do
+      :error -> {:ok, nil}
+      {:ok, type} when type in ["native", "web"] -> {:ok, type}
+      {:ok, _type} -> invalid_metadata(:application_type)
+    end
+  end
 
   defp client_name(value) when is_binary(value) and byte_size(value) <= @max_name_bytes do
     normalized = String.trim(value)
@@ -107,20 +113,43 @@ defmodule TamaOAuth.ClientRegistration do
 
   defp redirect_uris(values, application_type)
        when is_list(values) and values != [] and length(values) <= @max_list_values do
-    valid? =
-      values == Enum.uniq(values) and
-        Enum.all?(values, &valid_redirect?(&1, application_type))
-
-    if valid?, do: {:ok, values}, else: invalid_redirect()
+    with true <- values == Enum.uniq(values),
+         {:ok, normalized_application_type} <-
+           normalize_application_type(values, application_type) do
+      {:ok, values, normalized_application_type}
+    else
+      _ -> invalid_redirect()
+    end
   end
 
   defp redirect_uris(_values, _application_type), do: invalid_redirect()
 
+  defp normalize_application_type(values, nil) do
+    case values |> Enum.map(&redirect_type/1) |> Enum.uniq() do
+      [type] when type in ["native", "web"] -> {:ok, type}
+      _ -> :error
+    end
+  end
+
+  defp normalize_application_type(values, application_type) do
+    if Enum.all?(values, &valid_redirect?(&1, application_type)),
+      do: {:ok, application_type},
+      else: :error
+  end
+
+  defp redirect_type(value) do
+    cond do
+      valid_redirect?(value, "native") -> "native"
+      valid_redirect?(value, "web") -> "web"
+      true -> :invalid
+    end
+  end
+
   defp valid_redirect?(value, "web")
        when is_binary(value) and byte_size(value) <= @max_uri_bytes do
-    case Elixir.URI.parse(value) do
-      %Elixir.URI{scheme: "https", host: host, userinfo: nil, fragment: nil}
-      when is_binary(host) ->
+    case Elixir.URI.new(value) do
+      {:ok, %Elixir.URI{scheme: "https", host: host, port: port, userinfo: nil, fragment: nil}}
+      when is_binary(host) and port in 1..65_535 ->
         true
 
       _ ->
