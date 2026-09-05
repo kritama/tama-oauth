@@ -12,6 +12,8 @@ defmodule TamaOAuth.RemoteJSON do
   @default_deadline_ms 5_000
   @default_max_body_bytes 65_536
   @default_max_redirects 3
+  @max_trusted_private_origins 32
+  @hostname_label ~r/\A[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\z/
 
   @type response :: %{
           body: binary(),
@@ -48,6 +50,20 @@ defmodule TamaOAuth.RemoteJSON do
     do: public_ipv6_address?(address)
 
   def public_address?(_address), do: false
+
+  @doc false
+  @spec private_network_address?(term()) :: boolean()
+  def private_network_address?({a, b, c, d})
+      when a in 0..255 and b in 0..255 and c in 0..255 and d in 0..255 and
+             (a == 10 or (a == 172 and b in 16..31) or (a == 192 and b == 168)),
+      do: true
+
+  def private_network_address?({a, b, c, d, e, f, g, h})
+      when a in 0xFC00..0xFDFF and b in 0..0xFFFF and c in 0..0xFFFF and d in 0..0xFFFF and
+             e in 0..0xFFFF and f in 0..0xFFFF and g in 0..0xFFFF and h in 0..0xFFFF,
+      do: true
+
+  def private_network_address?(_address), do: false
 
   defp public_ipv4_address?({a, b, c, d} = address)
        when a in 0..255 and b in 0..255 and c in 0..255 and d in 0..255 do
@@ -93,10 +109,16 @@ defmodule TamaOAuth.RemoteJSON do
   defp guarded_fetch(url, opts) do
     redirects = Keyword.get(opts, :redirects, @default_max_redirects)
 
-    with :ok <- validate_origin(url, opts[:origin]),
-         {:ok, uri, addresses} <- validate_fetch_url(url, opts),
+    with {:ok, trusted_private_origins} <- trusted_private_origins(opts),
+         :ok <- validate_origin(url, opts[:origin]),
+         {:ok, uri, addresses} <- validate_fetch_url(url, opts, trusted_private_origins),
          {:ok, response} <- with_host_slot(uri.host, fn -> request(uri, addresses, opts) end) do
-      handle_response(response, url, Keyword.put(opts, :redirects, redirects))
+      response_opts =
+        opts
+        |> Keyword.put(:redirects, redirects)
+        |> Keyword.put(:normalized_trusted_private_origins, trusted_private_origins)
+
+      handle_response(response, url, response_opts)
     end
   rescue
     _ -> {:error, :unavailable}
@@ -128,7 +150,8 @@ defmodule TamaOAuth.RemoteJSON do
          [location] <- header_values(response.headers, "location"),
          next_url <-
            url |> Elixir.URI.parse() |> Elixir.URI.merge(location) |> Elixir.URI.to_string(),
-         :ok <- validate_origin(next_url, opts[:origin]) do
+         :ok <- validate_origin(next_url, opts[:origin]),
+         :ok <- validate_trusted_redirect(url, next_url, opts) do
       guarded_fetch(next_url, Keyword.put(opts, :redirects, redirects - 1))
     else
       _ -> {:error, :invalid_response}
@@ -146,26 +169,117 @@ defmodule TamaOAuth.RemoteJSON do
     if OAuthURI.same_origin?(url, origin), do: :ok, else: {:error, :invalid_origin}
   end
 
-  defp validate_fetch_url(url, opts) do
+  defp validate_fetch_url(url, opts, trusted_private_origins) do
     allow_local? = Keyword.get(opts, :allow_local?, false)
     resolver = Keyword.get(opts, :resolver, &resolve_addresses/1)
 
     with %Elixir.URI{host: host, userinfo: nil, fragment: nil} = uri when is_binary(host) <-
            Elixir.URI.parse(url),
-         true <- OAuthURI.web_url?(url, allow_local?: allow_local?),
+         true <-
+           OAuthURI.web_url?(url, allow_local?: allow_local?) or
+             trusted_private_origin?(uri, trusted_private_origins),
          {:ok, addresses} <- resolver.(host),
          true <- is_list(addresses) and addresses != [],
-         true <- Enum.all?(addresses, &allowed_address?(&1, allow_local?)) do
+         trusted_private? <- trusted_private_origin?(uri, trusted_private_origins),
+         true <- Enum.all?(addresses, &allowed_address?(&1, allow_local?, trusted_private?)) do
       {:ok, uri, addresses}
     else
       _ -> {:error, :invalid_url}
     end
   end
 
-  defp allowed_address?(address, true),
-    do: public_address?(address) or loopback_address?(address)
+  defp allowed_address?(address, allow_local?, trusted_private?) do
+    public_address?(address) or
+      (allow_local? and loopback_address?(address)) or
+      (trusted_private? and private_network_address?(address))
+  end
 
-  defp allowed_address?(address, false), do: public_address?(address)
+  defp trusted_private_origins(opts) do
+    configured =
+      case Application.get_env(:tama_oauth, __MODULE__, []) do
+        configuration when is_list(configuration) ->
+          Keyword.get(configuration, :trusted_private_origins, [])
+
+        _invalid_configuration ->
+          :invalid
+      end
+
+    opts
+    |> Keyword.get(:trusted_private_origins, configured)
+    |> normalize_trusted_private_origins()
+  end
+
+  defp normalize_trusted_private_origins(origins)
+       when is_list(origins) and length(origins) <= @max_trusted_private_origins do
+    with {:ok, normalized} <- normalize_origins(origins),
+         true <- length(normalized) == length(Enum.uniq(normalized)) do
+      {:ok, normalized}
+    else
+      _ -> {:error, :invalid_url}
+    end
+  end
+
+  defp normalize_trusted_private_origins(_origins), do: {:error, :invalid_url}
+
+  defp normalize_origins(origins) do
+    Enum.reduce_while(origins, {:ok, []}, fn origin, {:ok, normalized} ->
+      case normalize_trusted_private_origin(origin) do
+        {:ok, value} -> {:cont, {:ok, [value | normalized]}}
+        :error -> {:halt, :error}
+      end
+    end)
+  end
+
+  defp normalize_trusted_private_origin(origin) when is_binary(origin) do
+    case Elixir.URI.parse(origin) do
+      %Elixir.URI{
+        scheme: "https",
+        host: host,
+        port: port,
+        path: path,
+        query: nil,
+        fragment: nil,
+        userinfo: nil
+      }
+      when is_binary(host) and host != "" and port in 1..65_535 and path in [nil, "", "/"] ->
+        if hostname?(host), do: {:ok, {"https", String.downcase(host), port}}, else: :error
+
+      _uri ->
+        :error
+    end
+  rescue
+    _error -> :error
+  end
+
+  defp normalize_trusted_private_origin(_origin), do: :error
+
+  defp hostname?(host) when byte_size(host) in 1..253 do
+    case :inet.parse_address(String.to_charlist(host)) do
+      {:ok, _address} ->
+        false
+
+      {:error, _reason} ->
+        host
+        |> String.split(".")
+        |> Enum.all?(&Regex.match?(@hostname_label, &1))
+    end
+  end
+
+  defp hostname?(_host), do: false
+
+  defp trusted_private_origin?(%Elixir.URI{} = uri, trusted_private_origins) do
+    {String.downcase(uri.scheme || ""), String.downcase(uri.host || ""), uri.port} in trusted_private_origins
+  end
+
+  defp validate_trusted_redirect(url, next_url, opts) do
+    trusted_private_origins = Keyword.fetch!(opts, :normalized_trusted_private_origins)
+
+    if trusted_private_origin?(Elixir.URI.parse(url), trusted_private_origins) do
+      if OAuthURI.same_origin?(url, next_url), do: :ok, else: {:error, :invalid_origin}
+    else
+      :ok
+    end
+  end
 
   defp request(uri, addresses, opts) do
     requester = Keyword.get(opts, :requester, &default_request/3)
