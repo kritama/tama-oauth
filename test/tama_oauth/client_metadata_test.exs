@@ -115,6 +115,19 @@ defmodule TamaOAuth.ClientMetadataTest do
     assert_receive {:fetcher_allow_local, false}
   end
 
+  test "nested fetch options cannot override the top-level metadata fetch policy" do
+    opts =
+      [
+        fetcher: RecordingFetcher,
+        fetch_options: [document: codex_document(), allow_local?: true],
+        allow_local_metadata_fetch?: false,
+        allow_loopback_redirects?: true
+      ]
+
+    assert {:ok, _metadata} = ClientMetadata.fetch(@codex_client_id, opts)
+    assert_receive {:fetcher_allow_local, false}
+  end
+
   test "allows a localhost loopback redirect under the native client policy" do
     document = %{codex_document() | "redirect_uris" => ["http://localhost/callback"]}
 
@@ -122,6 +135,16 @@ defmodule TamaOAuth.ClientMetadataTest do
              ClientMetadata.validate(document, @codex_client_id, @production)
 
     assert metadata.redirect_uris == ["http://localhost/callback"]
+  end
+
+  test "rejects a loopback redirect when allow_loopback_redirects? is disabled" do
+    document = %{codex_document() | "redirect_uris" => ["http://127.0.0.1/callback"]}
+
+    assert {:error, :invalid_client_metadata} =
+             ClientMetadata.validate(document, @codex_client_id,
+               allow_local_metadata_fetch?: false,
+               allow_loopback_redirects?: false
+             )
   end
 
   test "rejects an HTTP redirect to a non-loopback host" do
@@ -169,6 +192,8 @@ defmodule TamaOAuth.ClientMetadataTest do
     refute ClientMetadata.redirect_allowed?("http://localhost:53713/callback", metadata)
     refute ClientMetadata.redirect_allowed?("https://127.0.0.1:53713/callback", metadata)
     refute ClientMetadata.redirect_allowed?("http://127.0.0.1:53713/callback?state=1", metadata)
+    refute ClientMetadata.redirect_allowed?("http://127.0.0.1:53713/callback#fragment", metadata)
+    refute ClientMetadata.redirect_allowed?("http://user@127.0.0.1:53713/callback", metadata)
   end
 
   test "does not apply ephemeral loopback matching to an explicitly ported redirect" do

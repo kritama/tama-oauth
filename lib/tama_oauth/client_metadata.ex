@@ -58,7 +58,9 @@ defmodule TamaOAuth.ClientMetadata do
 
     * `:fetcher` — the `TamaOAuth.ClientMetadata.Fetcher` to use (defaults to
       `TamaOAuth.ClientMetadata.ReqFetcher`).
-    * `:fetch_options` — options forwarded to the fetcher.
+    * `:fetch_options` — options forwarded to the fetcher. The fetcher's
+      `:allow_local?` is always set from `:allow_local_metadata_fetch?` and
+      cannot be widened through this option.
     * `:allow_local_metadata_fetch?` — allow the server to fetch a local or
       special-use Client Identifier URL. Defaults to `false`.
     * `:allow_loopback_redirects?` — allow HTTP loopback redirect URIs.
@@ -74,7 +76,7 @@ defmodule TamaOAuth.ClientMetadata do
       opts
       |> Keyword.get(:fetch_options, [])
       |> Keyword.put(:origin, client_id)
-      |> Keyword.put_new(:allow_local?, allow_local_metadata_fetch?)
+      |> Keyword.put(:allow_local?, allow_local_metadata_fetch?)
 
     with true <- valid_client_id_url?(client_id, opts),
          {:ok, response} <- fetcher.fetch(client_id, fetch_opts),
