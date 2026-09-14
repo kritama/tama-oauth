@@ -5,6 +5,18 @@ defmodule TamaOAuth.ClientMetadata do
   The caller decides which client IDs may be fetched and owns caching and
   persistence. This module guarantees that successful metadata is bound to the
   exact client ID URL and contains no symmetric client credentials.
+
+  Two independent trust boundaries are configured separately:
+
+    * `allow_local_metadata_fetch?` (default `false`) controls whether the
+      authorization server may treat local or special-use addresses as valid.
+      It applies to the Client Identifier URL that the server fetches and to
+      fetchable or server-referenced values such as `client_uri` and
+      `jwks_uri`. Keep it disabled in production to preserve SSRF protection.
+    * `allow_loopback_redirects?` (default `true`) controls whether a client's
+      `redirect_uris` may declare HTTP loopback callbacks, as native desktop
+      clients do under RFC 8252. It does not affect metadata fetching,
+      `client_uri`, or `jwks_uri`.
   """
 
   alias TamaOAuth.{Crypto, URI}
@@ -39,15 +51,32 @@ defmodule TamaOAuth.ClientMetadata do
 
   @type t :: %__MODULE__{}
 
+  @doc """
+  Fetches and validates a Client ID Metadata Document.
+
+  Options:
+
+    * `:fetcher` — the `TamaOAuth.ClientMetadata.Fetcher` to use (defaults to
+      `TamaOAuth.ClientMetadata.ReqFetcher`).
+    * `:fetch_options` — options forwarded to the fetcher. The fetcher's
+      `:allow_local?` is always set from `:allow_local_metadata_fetch?` and
+      cannot be widened through this option.
+    * `:allow_local_metadata_fetch?` — allow the server to fetch a local or
+      special-use Client Identifier URL. Defaults to `false`.
+    * `:allow_loopback_redirects?` — allow HTTP loopback redirect URIs.
+      Defaults to `true`.
+    * `:auth_methods`, `:signing_algorithms` — server-supported values.
+  """
   @spec fetch(String.t(), keyword()) :: {:ok, t()} | {:error, atom()}
   def fetch(client_id, opts \\ []) do
     fetcher = Keyword.get(opts, :fetcher, TamaOAuth.ClientMetadata.ReqFetcher)
+    allow_local_metadata_fetch? = Keyword.get(opts, :allow_local_metadata_fetch?, false)
 
     fetch_opts =
       opts
       |> Keyword.get(:fetch_options, [])
       |> Keyword.put(:origin, client_id)
-      |> Keyword.put_new(:allow_local?, Keyword.get(opts, :allow_local?, false))
+      |> Keyword.put(:allow_local?, allow_local_metadata_fetch?)
 
     with true <- valid_client_id_url?(client_id, opts),
          {:ok, response} <- fetcher.fetch(client_id, fetch_opts),
@@ -68,6 +97,12 @@ defmodule TamaOAuth.ClientMetadata do
     end
   end
 
+  @doc """
+  Validates an already-fetched Client ID Metadata Document.
+
+  Accepts the same `:allow_local_metadata_fetch?`, `:allow_loopback_redirects?`,
+  `:auth_methods`, and `:signing_algorithms` options as `fetch/2`.
+  """
   @spec validate(map(), String.t(), keyword()) :: {:ok, t()} | {:error, atom()}
   def validate(document, client_id, opts \\ [])
 
@@ -107,12 +142,13 @@ defmodule TamaOAuth.ClientMetadata do
 
   @spec valid_client_id_url?(term(), keyword()) :: boolean()
   def valid_client_id_url?(client_id, opts \\ []) do
-    allow_local? = Keyword.get(opts, :allow_local?, false)
+    allow_local_metadata_fetch? = Keyword.get(opts, :allow_local_metadata_fetch?, false)
 
     byte_size_valid? =
       is_binary(client_id) and byte_size(client_id) in 1..@max_client_id_bytes
 
-    byte_size_valid? and URI.web_url?(client_id, allow_local?: allow_local?) and
+    byte_size_valid? and
+      URI.web_url?(client_id, allow_local?: allow_local_metadata_fetch?) and
       case Elixir.URI.parse(client_id) do
         %Elixir.URI{path: path, query: nil, fragment: nil} -> is_binary(path) and path != ""
         _ -> false
@@ -149,17 +185,21 @@ defmodule TamaOAuth.ClientMetadata do
   defp validate_optional_uri(nil, _opts), do: {:ok, nil}
 
   defp validate_optional_uri(value, opts) do
-    if URI.web_url?(value, allow_local?: Keyword.get(opts, :allow_local?, false)),
+    allow_local_metadata_fetch? = Keyword.get(opts, :allow_local_metadata_fetch?, false)
+
+    if URI.web_url?(value, allow_local?: allow_local_metadata_fetch?),
       do: {:ok, value},
       else: {:error, :invalid_uri}
   end
 
   defp validate_redirects(values, opts) do
+    allow_loopback_redirects? = Keyword.get(opts, :allow_loopback_redirects?, true)
+
     valid? =
       bounded_unique_strings?(values) and
         Enum.all?(
           values,
-          &URI.valid_redirect?(&1, allow_local?: Keyword.get(opts, :allow_local?, true))
+          &URI.valid_redirect?(&1, allow_local?: allow_loopback_redirects?)
         )
 
     if valid?, do: {:ok, values}, else: {:error, :invalid_redirect_uris}
@@ -220,8 +260,10 @@ defmodule TamaOAuth.ClientMetadata do
 
   defp validate_jwks_uri(jwks_uri, client_id, methods, opts) do
     if "private_key_jwt" in methods do
+      allow_local_metadata_fetch? = Keyword.get(opts, :allow_local_metadata_fetch?, false)
+
       valid? =
-        URI.web_url?(jwks_uri, allow_local?: Keyword.get(opts, :allow_local?, false)) and
+        URI.web_url?(jwks_uri, allow_local?: allow_local_metadata_fetch?) and
           URI.same_origin?(jwks_uri, client_id)
 
       if valid?, do: {:ok, jwks_uri}, else: {:error, :invalid_jwks_uri}
