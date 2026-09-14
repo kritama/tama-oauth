@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.2](https://github.com/kritama/tama-oauth/compare/v0.4.1...v0.4.2) (2026-09-14)
+
+
+### Bug Fixes
+
+* make top-level metadata fetch policy authoritative over fetch options ([e979989](https://github.com/kritama/tama-oauth/commit/e979989e14393dd0166b080859534b5504c74b7b))
+* separate local metadata fetch policy from loopback redirect validation ([8566674](https://github.com/kritama/tama-oauth/commit/85666746db6c0f3328aabb4dff780e69ea7b66a2))
+* separate local metadata fetch policy from loopback redirect validation ([79dc013](https://github.com/kritama/tama-oauth/commit/79dc0139282e97869f65c0f7f4c003c4af2091f4))
+
 ## [0.4.1](https://github.com/kritama/tama-oauth/compare/v0.4.0...v0.4.1) (2026-09-05)
 
 
